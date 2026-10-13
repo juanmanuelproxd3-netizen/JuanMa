@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Huella de carbono y huella hídrica del grupo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #EAF0EE;
+    --surface: #F8FBFA;
+    --ink: #123430;
+    --muted: #4F6B66;
+    --line: #C9D8D4;
+    --viv: #E0A526;
+    --tra: #2D5FD0;
+    --con: #3E8E5A;
+    --water: #2BB0C9;
+    --focus: #123430;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1F1D;
+      --surface: #172A27;
+      --ink: #E6F1EE;
+      --muted: #9DB8B2;
+      --line: #2A413D;
+      --viv: #E8B64A;
+      --tra: #6C93F0;
+      --con: #6CBF86;
+      --water: #4CC6DC;
+      --focus: #E6F1EE;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1F1D;
+    --surface: #172A27;
+    --ink: #E6F1EE;
+    --muted: #9DB8B2;
+    --line: #2A413D;
+    --viv: #E8B64A;
+    --tra: #6C93F0;
+    --con: #6CBF86;
+    --water: #4CC6DC;
+    --focus: #E6F1EE;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1040px; margin: 0 auto; padding: 40px 20px 56px; }
+  h1 {
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(2.2rem, 6vw, 4rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0 0 14px;
+    max-width: 15ch;
+  }
+  .lede { margin: 0 0 32px; color: var(--muted); max-width: 56ch; font-size: 1.05rem; }
+
+  .switch {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px;
+    margin-bottom: 28px;
+  }
+  .switch button {
+    font: inherit;
+    font-weight: 600;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 8px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .switch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+  @media (max-width: 800px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+  .chart { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .col {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .col .val {
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(0.95rem, 2.6vw, 1.35rem);
+    margin-bottom: 8px;
+    min-height: 1.6em;
+    line-height: 1.2;
+  }
+  .well {
+    height: 300px;
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 2px solid var(--ink);
+  }
+  .stack {
+    width: 100%;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    transition: height 0.7s cubic-bezier(.2,.7,.2,1), gap 0.4s;
+    opacity: 0.55;
+  }
+  .water-mode .stack { gap: 0; }
+  .seg { background: var(--viv); transition: background-color 0.5s, flex-grow 0.7s; min-height: 2px; }
+  .seg.v { background: var(--viv); }
+  .seg.t { background: var(--tra); }
+  .seg.c { background: var(--con); }
+  .water-mode .seg { background: var(--water); }
+  .col[aria-pressed="true"] .stack,
+  .chart:not(.has-sel) .stack { opacity: 1; }
+  .col:hover .stack { opacity: 1; }
+  .col .name {
+    margin-top: 10px;
+    font-weight: 600;
+    font-size: clamp(0.78rem, 2.2vw, 0.95rem);
+    overflow-wrap: anywhere;
+    padding-bottom: 4px;
+  }
+  .col[aria-pressed="true"] .name { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; }
+  .col:focus-visible, .switch button:focus-visible, .reset:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 6px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 18px; color: var(--muted); font-size: 0.9rem; min-height: 1.5em; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .legend i { width: 12px; height: 12px; display: inline-block; border-radius: 3px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .panel h2 {
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 1.15rem;
+    margin: 0 0 4px;
+    color: var(--muted);
+  }
+  .big {
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(2.2rem, 5vw, 3.2rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0 0 18px;
+    overflow-wrap: anywhere;
+  }
+  .big small { font-size: 0.4em; font-weight: 500; letter-spacing: 0; color: var(--muted); margin-left: 6px; }
+  .row { margin-bottom: 14px; }
+  .row .top { display: flex; justify-content: space-between; gap: 12px; font-size: 0.95rem; margin-bottom: 5px; }
+  .row .top b { font-weight: 600; }
+  .track { height: 10px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 99px; transition: width 0.6s cubic-bezier(.2,.7,.2,1); }
+  .note { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--line); max-width: 52ch; }
+  .reset {
+    font: inherit; font-weight: 600; background: none; border: 0; color: var(--ink);
+    text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 0; margin-top: 14px;
+  }
+  .foot { margin-top: 36px; color: var(--muted); font-size: 0.85rem; max-width: 70ch; }
+
+  .sec { margin-top: 56px; }
+  .sec > h2 {
+    font-family: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 12px;
+  }
+  .quiz { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin: 4px 0 28px; }
+  .qbox + .qbox { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .qtext { margin: 0; font-weight: 600; font-size: 1.05rem; }
+  .opts { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+  .opt {
+    font: inherit; font-weight: 600; color: var(--ink);
+    background: var(--bg); border: 2px solid var(--line); border-radius: 10px;
+    padding: 9px 16px; cursor: pointer;
+  }
+  .opt:focus-visible, .act:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+  .opt.ok { border-color: var(--con); border-width: 3px; padding: 8px 15px; }
+  .opt.no { border-style: dashed; opacity: 0.75; }
+  .fb { margin: 0; color: var(--muted); min-height: 1.5em; max-width: 60ch; }
+
+  .actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .act {
+    text-align: left; font: inherit; color: inherit; cursor: pointer;
+    background: var(--surface); border: 2px solid var(--line); border-left-width: 8px;
+    border-radius: 12px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .act b { font-weight: 600; color: var(--muted); font-size: 0.9rem; }
+  .act[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--ink); background: var(--bg); }
+  .act[aria-pressed="true"] b { color: var(--ink); }
+  .hint { margin: 12px 0 0; color: var(--muted); font-size: 0.85rem; max-width: 70ch; }
+  .score { margin-top: 24px; }
+  .meter { height: 16px; background: var(--bg); border-radius: 99px; overflow: hidden; margin: 0 0 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stack, .seg, .fill { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Huella de carbono y huella hídrica del grupo</h1>
+  <p class="lede">Cuatro integrantes, tres fuentes de emisión. Toca una columna para ver el detalle de cada persona.</p>
+
+  <div class="switch" role="group" aria-label="Tipo de huella">
+    <button type="button" id="btn-carbon" aria-pressed="true">Carbono</button>
+    <button type="button" id="btn-water" aria-pressed="false">Agua</button>
+  </div>
+
+  <div class="layout">
+    <section aria-label="Gráfico por integrante">
+      <div class="chart" id="chart"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <section class="sec" aria-labelledby="game-h">
+    <h2 id="game-h">Reto: ¿cómo bajamos la huella?</h2>
+    <p class="lede">Respondan dos preguntas y luego elijan acciones para cumplir la meta: bajar el 20% de la huella de carbono del grupo.</p>
+    <div class="quiz" id="quiz"></div>
+    <div class="actions" id="actions"></div>
+    <p class="hint">Los porcentajes de cada acción son valores de ejemplo para el juego, no mediciones. Si combinan acciones sobre la misma fuente, el ahorro real es menor que la suma.</p>
+    <div class="panel score" id="score" aria-live="polite"></div>
+  </section>
+
+  <p class="foot">Carbono en toneladas de CO₂ por vivienda, transporte y consumo. Huella hídrica en litros. Datos de la tabla “Consumo” del grupo.</p>
+</main>
+
+<script>
+  var PEOPLE = [
+    { n: "JuanMa",           v: 0.8, t: 2.7, c: 3.2, tot: 6.7,  w: 506950 },
+    { n: "Juan Ruiz",        v: 1.0, t: 0.3, c: 3.3, tot: 4.6,  w: 375011 },
+    { n: "Carlos Potosí",    v: 0.9, t: 0.2, c: 2.4, tot: 3.5,  w: 195784 },
+    { n: "Katherin Quiñonez", v: 0.7, t: 6.0, c: 4.2, tot: 10.9, w: 761508 }
+  ];
+  var CATS = [
+    { k: "v", name: "Vivienda",   color: "var(--viv)" },
+    { k: "t", name: "Transporte", color: "var(--tra)" },
+    { k: "c", name: "Consumo",    color: "var(--con)" }
+  ];
+  var POOL = 2500000, TUB = 150;
+
+  var state = { mode: "carbon", sel: null };
+
+  function fmtT(n) { return n.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+  function fmtL(n) { return n.toLocaleString("es-CO"); }
+  function pct(n) { return Math.round(n * 100); }
+  function sum(arr, f) { return arr.reduce(function (a, p) { return a + f(p); }, 0); }
+
+  var TOT_C = sum(PEOPLE, function (p) { return p.tot; });
+  var TOT_W = sum(PEOPLE, function (p) { return p.w; });
+  var MAX_C = Math.max.apply(null, PEOPLE.map(function (p) { return p.tot; }));
+  var MAX_W = Math.max.apply(null, PEOPLE.map(function (p) { return p.w; }));
+
+  var chart = document.getElementById("chart");
+  var legend = document.getElementById("legend");
+  var panel = document.getElementById("panel");
+
+  // Construir columnas una sola vez
+  PEOPLE.forEach(function (p, i) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "col";
+    b.setAttribute("aria-pressed", "false");
+    b.setAttribute("aria-label", p.n);
+    var segs = CATS.map(function (c) {
+      return '<div class="seg ' + c.k + '" style="flex-grow:' + p[c.k] + '" title="' + c.name + ': ' + fmtT(p[c.k]) + ' T"></div>';
+    }).join("");
+    b.innerHTML =
+      '<div class="val"></div>' +
+      '<div class="well"><div class="stack">' + segs + '</div></div>' +
+      '<div class="name">' + p.n + '</div>';
+    b.addEventListener("click", function () {
+      state.sel = (state.sel === i) ? null : i;
+      render();
+    });
+    chart.appendChild(b);
+  });
+
+  document.getElementById("btn-carbon").addEventListener("click", function () { state.mode = "carbon"; render(); });
+  document.getElementById("btn-water").addEventListener("click", function () { state.mode = "water"; render(); });
+
+  function row(label, valueText, share, color) {
+    return '<div class="row"><div class="top"><span>' + label + '</span><b>' + valueText + '</b></div>' +
+      '<div class="track"><div class="fill" style="width:' + Math.max(share * 100, 1.5) + '%;background:' + color + '"></div></div></div>';
+  }
+
+  function renderPanel() {
+    var carbon = state.mode === "carbon";
+    var html = "";
+    var p = state.sel === null ? null : PEOPLE[state.sel];
+
+    if (carbon && !p) {
+      var cat = CATS.map(function (c) { return { c: c, total: sum(PEOPLE, function (x) { return x[c.k]; }) }; })
+                    .sort(function (a, b) { return b.total - a.total; });
+      var top = PEOPLE.slice().sort(function (a, b) { return b.tot - a.tot; })[0];
+      html += '<h2>Grupo completo</h2><p class="big">' + fmtT(TOT_C) + '<small>T de CO₂</small></p>';
+      CATS.forEach(function (c) {
+        var t = sum(PEOPLE, function (x) { return x[c.k]; });
+        html += row(c.name, fmtT(t) + " T · " + pct(t / TOT_C) + "%", t / TOT_C, c.color);
+      });
+      html += '<p class="note">' + cat[0].c.name + ' es la fuente más grande: ' + pct(cat[0].total / TOT_C) +
+              '% del total. ' + top.n + ' aporta más que nadie, con ' + pct(top.tot / TOT_C) +
+              '%. El promedio por persona es ' + fmtT(TOT_C / PEOPLE.length) + ' T.</p>';
+    } else if (carbon && p) {
+      var own = CATS.slice().sort(function (a, b) { return p[b.k] - p[a.k]; })[0];
+      html += '<h2>' + p.n + '</h2><p class="big">' + fmtT(p.tot) + '<small>T de CO₂</small></p>';
+      CATS.forEach(function (c) {
+        html += row(c.name, fmtT(p[c.k]) + " T · " + pct(p[c.k] / p.tot) + "%", p[c.k] / p.tot, c.color);
+      });
+      html += '<p class="note">Su mayor fuente es ' + own.name.toLowerCase() + ' (' + pct(p[own.k] / p.tot) +
+              '% de su huella). Representa el ' + pct(p.tot / TOT_C) + '% del total del grupo.</p>';
+    } else if (!carbon && !p) {
+      html += '<h2>Grupo completo</h2><p class="big">' + fmtL(TOT_W) + '<small>litros</small></p>';
+      PEOPLE.forEach(function (x) {
+        html += row(x.n, fmtL(x.w) + " L · " + pct(x.w / TOT_W) + "%", x.w / TOT_W, "var(--water)");
+      });
+      html += '<p class="note">Entre los cuatro suman cerca del ' + pct(TOT_W / POOL) +
+              '% de una piscina olímpica (' + fmtL(POOL) + ' L).</p>';
+    } else {
+      html += '<h2>' + p.n + '</h2><p class="big">' + fmtL(p.w) + '<small>litros</small></p>';
+      html += row("Parte del grupo", pct(p.w / TOT_W) + "%", p.w / TOT_W, "var(--water)");
+      html += '<p class="note">Equivale a unas ' + fmtL(Math.round(p.w / TUB)) +
+              ' bañeras de ' + TUB + ' L.</p>';
+    }
+    if (state.sel !== null) html += '<button type="button" class="reset" id="reset">Ver el grupo completo</button>';
+    panel.innerHTML = html;
+    var r = document.getElementById("reset");
+    if (r) r.addEventListener("click", function () { state.sel = null; render(); });
+  }
+
+  function render() {
+    var carbon = state.mode === "carbon";
+    document.getElementById("btn-carbon").setAttribute("aria-pressed", carbon);
+    document.getElementById("btn-water").setAttribute("aria-pressed", !carbon);
+    chart.classList.toggle("water-mode", !carbon);
+    chart.classList.toggle("has-sel", state.sel !== null);
+    document.querySelector(".chart").parentNode.classList.toggle("water-mode", !carbon);
+
+    var cols = chart.children;
+    for (var i = 0; i < cols.length; i++) {
+      var p = PEOPLE[i];
+      var h = carbon ? p.tot / MAX_C : p.w / MAX_W;
+      cols[i].querySelector(".stack").style.height = (h * 100) + "%";
+      cols[i].querySelector(".val").textContent = carbon ? fmtT(p.tot) + " T" : fmtL(p.w) + " L";
+      cols[i].setAttribute("aria-pressed", state.sel === i);
+    }
+
+    legend.innerHTML = carbon
+      ? CATS.map(function (c) { return '<span><i style="background:' + c.color + '"></i>' + c.name + '</span>'; }).join("")
+      : '<span><i style="background:var(--water)"></i>Litros de agua por integrante</span>';
+
+    renderPanel();
+  }
+
+  // ---------- Preguntas ----------
+  var catTot = {};
+  CATS.forEach(function (c) { catTot[c.k] = sum(PEOPLE, function (x) { return x[c.k]; }); });
+  var maxCat = CATS.slice().sort(function (a, b) { return catTot[b.k] - catTot[a.k]; })[0];
+  var topT = PEOPLE.slice().sort(function (a, b) { return b.t - a.t; })[0];
+
+  var QUIZ = [
+    {
+      q: "Antes de jugar: ¿cuál de las tres fuentes pesa más en la huella del grupo?",
+      opts: CATS.map(function (c) { return c.name; }),
+      ans: CATS.indexOf(maxCat),
+      why: maxCat.name + " suma " + fmtT(catTot[maxCat.k]) + " T, el " + pct(catTot[maxCat.k] / TOT_C) + "% del total."
+    },
+    {
+      q: "¿Quién tiene la huella de transporte más alta?",
+      opts: PEOPLE.map(function (p) { return p.n; }),
+      ans: PEOPLE.indexOf(topT),
+      why: topT.n + " tiene " + fmtT(topT.t) + " T de transporte, el " + pct(topT.t / catTot.t) + "% del transporte de todo el grupo."
+    }
+  ];
+
+  var quizEl = document.getElementById("quiz");
+  QUIZ.forEach(function (item) {
+    var box = document.createElement("div");
+    box.className = "qbox";
+    box.innerHTML = '<p class="qtext">' + item.q + '</p><div class="opts"></div><p class="fb" aria-live="polite"></p>';
+    var opts = box.querySelector(".opts");
+    var fb = box.querySelector(".fb");
+    item.opts.forEach(function (label, idx) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      b.textContent = label;
+      b.addEventListener("click", function () {
+        var btns = opts.children;
+        for (var k = 0; k < btns.length; k++) {
+          btns[k].classList.remove("ok", "no");
+          btns[k].textContent = item.opts[k];
+        }
+        if (idx === item.ans) {
+          b.classList.add("ok");
+          b.textContent = "✓ " + label;
+          fb.textContent = "¡Correcto! " + item.why;
+        } else {
+          b.classList.add("no");
+          b.textContent = "✗ " + label;
+          fb.textContent = "Casi. La respuesta es " + item.opts[item.ans] + ". " + item.why;
+        }
+      });
+      opts.appendChild(b);
+    });
+    quizEl.appendChild(box);
+  });
+
+  // ---------- Reto ----------
+  var ACTIONS = [
+    { id: "bici",  name: "Ir en bicicleta o caminar los trayectos cortos",       cat: "t", r: 0.35 },
+    { id: "bus",   name: "Usar transporte público en vez de carro o moto",       cat: "t", r: 0.30 },
+    { id: "luz",   name: "Apagar luces y desconectar los equipos que no usamos", cat: "v", r: 0.25 },
+    { id: "carne", name: "Tener días sin carne en la semana",                    cat: "c", r: 0.20 },
+    { id: "ropa",  name: "Reparar y reutilizar antes de comprar nuevo",          cat: "c", r: 0.15 },
+    { id: "rec",   name: "Separar y reciclar los residuos",                      cat: "c", r: 0.10 }
+  ];
+  var GOAL = 0.2;
+  var picked = {};
+  var actionsEl = document.getElementById("actions");
+  var scoreEl = document.getElementById("score");
+
+  ACTIONS.forEach(function (a) {
+    var cat = CATS.filter(function (c) { return c.k === a.cat; })[0];
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "act";
+    b.setAttribute("aria-pressed", "false");
+    b.style.borderLeftColor = cat.color;
+    b.innerHTML = "<span>" + a.name + "</span><b>Ahorra hasta " + fmtT(catTot[a.cat] * a.r) + " T en " + cat.name.toLowerCase() + "</b>";
+    b.addEventListener("click", function () {
+      picked[a.id] = !picked[a.id];
+      b.setAttribute("aria-pressed", picked[a.id] ? "true" : "false");
+      renderScore();
+    });
+    actionsEl.appendChild(b);
+  });
+
+  function renderScore() {
+    var after = 0;
+    CATS.forEach(function (c) {
+      var f = 1;
+      ACTIONS.forEach(function (a) { if (picked[a.id] && a.cat === c.k) f *= (1 - a.r); });
+      after += catTot[c.k] * f;
+    });
+    var saved = TOT_C - after;
+    var ratio = saved / TOT_C;
+    var n = ACTIONS.filter(function (a) { return picked[a.id]; }).length;
+    var msg;
+    if (!n) {
+      msg = "Elijan acciones para empezar. La meta es bajar el " + pct(GOAL) + "% de la huella del grupo.";
+    } else if (ratio >= GOAL) {
+      msg = "¡Meta lograda! Bajaron el " + pct(ratio) + "% (" + fmtT(saved) + " T menos). Ahora piensen: ¿cuáles de estas acciones podemos cumplir de verdad?";
+    } else {
+      msg = "Van en el " + Math.floor(ratio * 100) + "%. Les faltan " + fmtT(TOT_C * GOAL - saved) + " T para llegar a la meta del " + pct(GOAL) + "%.";
+    }
+    scoreEl.innerHTML =
+      '<h2>Resultado del reto</h2>' +
+      '<p class="big">' + fmtT(after) + '<small>T de CO₂ (antes ' + fmtT(TOT_C) + ' T)</small></p>' +
+      '<div class="meter" role="img" aria-label="Avance hacia la meta"><div class="fill" style="width:' + Math.min(ratio / GOAL, 1) * 100 + '%;background:var(--con)"></div></div>' +
+      '<p class="note">' + msg + '</p>' +
+      (n ? '<button type="button" class="reset" id="reset-game">Empezar de nuevo</button>' : '');
+    var r = document.getElementById("reset-game");
+    if (r) {
+      r.addEventListener("click", function () {
+        picked = {};
+        var btns = actionsEl.children;
+        for (var k = 0; k < btns.length; k++) btns[k].setAttribute("aria-pressed", "false");
+        renderScore();
+      });
+    }
+  }
+
+  renderScore();
+  render();
+</script>
+</body>
+</html>
